@@ -1,0 +1,8 @@
+---
+projectName: wurstscript-custom-attack
+dependencies:
+- https://github.com/wurstscript/wurstStdlib2
+buildMapData:
+  name: wurstscript-custom-attack
+  fileName: wurstscript-custom-attack
+  author: stn
