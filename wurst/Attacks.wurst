@@ -1,0 +1,169 @@
+/**
+    This package provides a light-weight system for customizing unit attacks.
+
+    Example of a ranged multishot attack:
+    
+        let attack = new AttackDefinition()
+        
+        attack.weaponType = WEAPON_TYPE.MISSILE
+        attack.range = RANGER_ATTACK_RANGE
+        attack.maxTargets = 5
+        attack.missile.art = "Abilities\\Weapons\\Arrow\\ArrowMissile.mdl"
+        attack.missile.speed = 2000
+        
+        createUnit(RANGER_ID)
+            ..addAttack("main", attack)
+
+    Make sure to match the unit and attack definition:
+
+        let RANGER_ID = compiletime(HERO_ID_GEN.next())
+        let RANGER_ATTACK_RANGE = 1200
+
+        new HeroDefinition(RANGER_ID, UnitIds.sylvanuswindrunner)
+            ..setAttack1WeaponType(WeaponType.Instant)
+            ..setAttack1ProjectileArt("")
+            ..setAttack1Range(RANGER_ATTACK_RANGE)
+*/
+package Attacks
+import ClosureForGroups
+import DamageEvent
+import HashMap
+import LinkedList
+
+import Missile
+
+/** Covers all functional weapon types. */
+public enum WEAPON_TYPE
+    MELEE
+    INSTANT
+    MISSILE
+
+/** Covers all available attack types. */
+class ATTACK_TYPE
+    static constant SPELLS = ATTACK_TYPE_NORMAL
+    static constant MAGIC = ATTACK_TYPE_MAGIC
+    static constant NORMAL = ATTACK_TYPE_MELEE
+    static constant PIERCING = ATTACK_TYPE_PIERCE
+    static constant SIEGE = ATTACK_TYPE_SIEGE
+    static constant HERO = ATTACK_TYPE_HERO
+    static constant CHAOS = ATTACK_TYPE_CHAOS
+
+/** Covers all four functional damage types. */
+class DAMAGE_TYPE
+    /** Physical */
+    static constant PHYSICAL = DAMAGE_TYPE_NORMAL
+    /** Enhanced: Ignores armor. */
+    static constant ENHANCED = DAMAGE_TYPE_ENHANCED
+    /** Magic: Ignores armor. Does not affect the spell immune. */
+    static constant MAGIC = DAMAGE_TYPE_MAGIC
+    /** Universal: Ignores armor. Ignores defense type. */
+    static constant UNIVERSAL = DAMAGE_TYPE_UNIVERSAL
+
+/** Covers all available weapon sounds. */
+class WEAPON_SOUND
+    static constant WHOKNOWS = WEAPON_TYPE_WHOKNOWS
+    static constant METAL_LIGHT_CHOP = WEAPON_TYPE_METAL_LIGHT_CHOP
+    static constant METAL_MEDIUM_CHOP = WEAPON_TYPE_METAL_MEDIUM_CHOP
+    static constant METAL_HEAVY_CHOP = WEAPON_TYPE_METAL_HEAVY_CHOP
+    static constant METAL_LIGHT_SLICE = WEAPON_TYPE_METAL_LIGHT_SLICE
+    static constant METAL_MEDIUM_SLICE = WEAPON_TYPE_METAL_MEDIUM_SLICE
+    static constant METAL_HEAVY_SLICE = WEAPON_TYPE_METAL_HEAVY_SLICE
+    static constant METAL_MEDIUM_BASH = WEAPON_TYPE_METAL_MEDIUM_BASH
+    static constant METAL_HEAVY_BASH = WEAPON_TYPE_METAL_HEAVY_BASH
+    static constant METAL_MEDIUM_STAB = WEAPON_TYPE_METAL_MEDIUM_STAB
+    static constant METAL_HEAVY_STAB = WEAPON_TYPE_METAL_HEAVY_STAB
+    static constant WOOD_LIGHT_SLICE = WEAPON_TYPE_WOOD_LIGHT_SLICE
+    static constant WOOD_MEDIUM_SLICE = WEAPON_TYPE_WOOD_MEDIUM_SLICE
+    static constant WOOD_HEAVY_SLICE = WEAPON_TYPE_WOOD_HEAVY_SLICE
+    static constant WOOD_LIGHT_BASH = WEAPON_TYPE_WOOD_LIGHT_BASH
+    static constant WOOD_MEDIUM_BASH = WEAPON_TYPE_WOOD_MEDIUM_BASH
+    static constant WOOD_HEAVY_BASH = WEAPON_TYPE_WOOD_HEAVY_BASH
+    static constant WOOD_LIGHT_STAB = WEAPON_TYPE_WOOD_LIGHT_STAB
+    static constant WOOD_MEDIUM_STAB = WEAPON_TYPE_WOOD_MEDIUM_STAB
+    static constant CLAW_LIGHT_SLICE = WEAPON_TYPE_CLAW_LIGHT_SLICE
+    static constant CLAW_MEDIUM_SLICE = WEAPON_TYPE_CLAW_MEDIUM_SLICE
+    static constant CLAW_HEAVY_SLICE = WEAPON_TYPE_CLAW_HEAVY_SLICE
+    static constant AXE_MEDIUM_CHOP = WEAPON_TYPE_AXE_MEDIUM_CHOP
+    static constant ROCK_HEAVY_BASH = WEAPON_TYPE_ROCK_HEAVY_BASH
+
+constant DAMAGE_ELEMENT_BASE = new DamageElement("Base", colorA(255, 255, 255, 255))
+
+public class AttackDefinition
+    var damageId = '0000'
+    var damageElement = DAMAGE_ELEMENT_BASE
+    var weaponType = WEAPON_TYPE.MISSILE
+    var attackType = ATTACK_TYPE.NORMAL
+    var damageType = DAMAGE_TYPE.PHYSICAL
+    var weaponSound = WEAPON_SOUND.WHOKNOWS
+    var range = 800
+    var maxTargets = 1
+    var missile = new MissileDefinition()
+    var collisionDamage = true
+    var collisionFactor = 1.
+
+/** Use this to add a new attack to a unit. */
+public function unit.addAttack(string id, AttackDefinition def)
+    new Attacks(this, id, def)
+
+class Attacks
+
+    /** Use unit.addAttack(string id, AttackDefinition def) instead. */
+    construct(unit u, string id, AttackDefinition def)
+        if not map.has(u)
+            map.put(u, this)
+
+        map.get(u).enabled.put(id, def)
+
+    /* Each unit can have a unique instance of this class. */
+    private static constant map = new HashMap<unit, Attacks>
+
+    /* Each unit can have any number of attacks. */
+    private constant enabled = new IterableMap<string, AttackDefinition>
+        
+    /* Annul the original damage event and replace with the custom defined attack */
+    protected static function substitute()
+        let source = DamageEvent.getSource()
+
+        if map.has(source)
+            let target = DamageEvent.getTarget()
+            let amount = DamageEvent.getAmount()
+
+            DamageEvent.abortCurrent()
+
+            map.get(source).enabled.forEach() (id, def) ->
+                switch def.weaponType
+                    case MISSILE
+                        onMissile(source, target, amount, def)
+                    default
+                        onHit(source, target, amount, def)
+
+    private static function onMissile(unit source, unit target, real amount, AttackDefinition def)
+        let enemyUnits = new LinkedList<unit>
+        forUnitsInRange(source.getPos(), def.range.toReal()) u ->
+            if u.isAlive() and u.isEnemyOf(source.getOwner())
+                enemyUnits.add(u)
+
+        enemyUnits.shuffle()
+        enemyUnits.add(target)
+        for ii = 1 to def.maxTargets
+            new Missile(source.getPos3Fly(), enemyUnits.pop(), def.missile)
+                ..setOnCollision(u -> onCollision(source, u, amount, def))
+                ..setOnHitUnit(u -> onHit(source, u, amount, def))
+
+    /* Compatible with the DamageEvent package */
+    private static function onHit(unit source, unit target, real amount, AttackDefinition def)
+        let ranged = def.weaponType == WEAPON_TYPE.MELEE ? false : true
+        DamageEvent.setNextDamageId(def.damageId)
+        DamageEvent.setNextDamageFromCode()
+        UnitDamageTarget(source, target, amount, true, ranged, def.attackType, def.damageType, def.weaponSound)
+
+    /* By default, missiles with collision size will deal full damage on collision */
+    private static function onCollision(unit source, unit target, real amount, AttackDefinition def)
+        def.missile.onCollision.callback(target)
+        if def.collisionDamage
+            onHit(source, target, def.collisionFactor * amount, def)
+
+init
+    DamageEvent.addUnreducedListener(0) ->
+        if DamageEvent.getType() == DamageType.ATTACK
+            Attacks.substitute()

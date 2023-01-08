@@ -1,0 +1,47 @@
+package Setup
+import Assets
+import ChannelAbilityPreset
+
+import Attacks
+
+let RANGER_ID = compiletime(HERO_ID_GEN.next())
+let RANGER_ATTACK_RANGE = 1200
+
+// Mechanics
+init
+    SetTimeOfDay(8.)
+
+    let attack = new AttackDefinition()
+    
+    attack.weaponType = WEAPON_TYPE.MISSILE
+    attack.range = RANGER_ATTACK_RANGE
+    attack.maxTargets = 5
+    attack.missile.art = "Abilities\\Weapons\\Arrow\\ArrowMissile.mdl"
+    attack.missile.speed = 2000
+    // attack.missile.collisionSize = 48.
+    // attack.missile.onCollision = u -> print(GetRandomInt(0, 1).toString())
+    attack.missile.trail = Abilities.blinkCaster
+    attack.missile.trailAttach = vec3(0., 0., -80.)
+    
+    createUnit(RANGER_ID)
+        ..setLevel(5, false)
+        ..addAttack("main", attack)
+    
+    for ii = 1 to 100
+        createUnit(players[1], UnitIds.peasant, vec2(GetRandomReal(-800., -500.), GetRandomReal(-500., 500.)))
+
+@compiletime function gen()
+    new HeroDefinition(RANGER_ID, UnitIds.sylvanuswindrunner)
+        ..setName("Ranger")
+        ..setProperNames("Sylvanas")
+        ..setNormalAbilities("AInv")
+        ..setAttack1CooldownTime(1.0)
+        ..setAttack1WeaponType(WeaponType.Normal)
+        ..setAttack1Range(RANGER_ATTACK_RANGE)
+        ..setAcquisitionRange(1200.0)
+        ..setHitPointsMaximumBase(1000)
+        ..setUnitSoundSet("Arthas")
+        ..setIconScoreScreen("ReplaceableTextures\\CommandButtons\\BTNSylvanusWindrunner.blp")
+        ..setCollisionSize(24.0)
+        ..setSelectionScale(1.2)
+        ..setHeroAbilities("")
